@@ -1,27 +1,19 @@
 version: '3.8'
 
 services:
-  db:
-    image: mysql:8.0
-    container_name: mysql_db
-    restart: always
-    environment:
-      MYSQL_DATABASE: mi_base_de_datos
-      MYSQL_ROOT_PASSWORD: tu_password_seguro
-    ports:
-      - "3306:3306"
-    volumes:
-      - db_data:/var/lib/mysql
-
   api:
     build: .
-    container_name: fastapi_app
+    container_name: fastapi_api
+    restart: always
+    # Cargamos las variables del .env para que main.py las reconozca
+    env_file:
+      - .env
     ports:
-      - "8000:8000"
-    environment:
-      - DATABASE_URL=mysql+pymysql://root:tu_password_seguro@db:3306/mi_base_de_datos
-    depends_on:
-      - db
+      - "${PUERTO_API}:8000"
+    # Esta configuración permite que el contenedor vea servicios en el host del VPS
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
-volumes:
-  db_data:
+networks:
+  default:
+    name: fastapi_network
