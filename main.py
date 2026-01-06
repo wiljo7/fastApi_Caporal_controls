@@ -118,4 +118,5 @@ def leer_item(codigo: str, db: Session = Depends(get_db)):
                         "DB_SERVER_ALARMS":DB_SERVER_ALARMS,
                         "DB_PORT_ALARMS":DB_PORT_ALARMS 
                         }
+    "out"
     return resultado, alarms
