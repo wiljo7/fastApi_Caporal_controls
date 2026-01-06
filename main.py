@@ -13,11 +13,20 @@ from dotenv import load_dotenv
 # 2. Cargar variables de entorno desde el archivo .env
 load_dotenv()
 
+# conexion controls user
 DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
 DB_SERVER = os.getenv("DB_SERVER")
 DB_PORT = os.getenv("DB_PORT")
 DB_NAME = os.getenv("DB_NAME")
+
+# conexion alarms
+DB_ALARMS=os.getenv("DB_ALARMS")
+DB_USER_ALARMS=os.getenv("DB_USER_ALARMS")
+DB_PASSWORD_ALARMS=os.getenv("DB_PASSWORD_ALARMS")
+DB_SERVER_ALARMS=os.getenv("DB_SERVER_ALARMS")
+DB_PORT_ALARMS=os.getenv("DB_PORT_ALARMS") 
+
 
 # 3. Configuración de la URL de conexión para MySQL
 # La cadena usa pymysql para comunicarse con la instancia externa
@@ -103,5 +112,10 @@ def leer_item(codigo: str, db: Session = Depends(get_db)):
             status_code=404, 
             detail=f"El código {codigo} no existe en el sistema"
         )
-    
-    return resultado
+    alarms={"DB_ALARMS":DB_ALARMS,
+                        "DB_USER_ALARMS":DB_USER_ALARMS,
+                        "DB_PASSWORD_ALARMS":DB_PASSWORD_ALARMS,
+                        "DB_SERVER_ALARMS":DB_SERVER_ALARMS,
+                        "DB_PORT_ALARMS":DB_PORT_ALARMS 
+                        }
+    return resultado, alarms
