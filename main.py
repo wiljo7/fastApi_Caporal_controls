@@ -2,7 +2,6 @@ import os
 from datetime import date
 from typing import List, Optional
 
-# 1. Importaciones de FastAPI y SQLAlchemy
 from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel
 from sqlalchemy import create_engine, Column, Integer, String, Date
@@ -10,38 +9,29 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from dotenv import load_dotenv
 
-# 2. Cargar variables de entorno desde el archivo .env
 load_dotenv()
 
-# conexion controls user
+# --- CONFIGURACIÓN DE BASE DE DATOS ---
 DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
 DB_SERVER = os.getenv("DB_SERVER")
 DB_PORT = os.getenv("DB_PORT")
 DB_NAME = os.getenv("DB_NAME")
 
-# conexion alarms
-DB_ALARMS=os.getenv("DB_ALARMS")
-DB_USER_ALARMS=os.getenv("DB_USER_ALARMS")
-DB_PASSWORD_ALARMS=os.getenv("DB_PASSWORD_ALARMS")
-DB_SERVER_ALARMS=os.getenv("DB_SERVER_ALARMS")
-DB_PORT_ALARMS=os.getenv("DB_PORT_ALARMS") 
+# Variables de Alarma
+DB_ALARMS = os.getenv("DB_ALARMS")
+DB_USER_ALARMS = os.getenv("DB_USER_ALARMS")
+DB_PASSWORD_ALARMS = os.getenv("DB_PASSWORD_ALARMS")
+DB_SERVER_ALARMS = os.getenv("DB_SERVER_ALARMS")
+DB_PORT_ALARMS = os.getenv("DB_PORT_ALARMS")
 
-
-# 3. Configuración de la URL de conexión para MySQL
-# La cadena usa pymysql para comunicarse con la instancia externa
 SQLALCHEMY_DATABASE_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_SERVER}:{DB_PORT}/{DB_NAME}"
 
-# Creamos el engine con pool_pre_ping para evitar desconexiones de la BD externa
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, 
-    pool_pre_ping=True
-)
-
+engine = create_engine(SQLALCHEMY_DATABASE_URL, pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-# 4. Modelo de la Tabla (SQLAlchemy)
+# --- MODELO SQLALCHEMY ---
 class Item(Base):
     __tablename__ = "clients_caporalsg"
     
@@ -60,7 +50,7 @@ class Item(Base):
     server_db = Column(String(255))
     expiration_date = Column(Date)
 
-# 5. Esquema de Respuesta (Pydantic) para formatear el JSON de salida
+# --- ESQUEMAS PYDANTIC ---
 class ItemResponse(BaseModel):
     id: int
     uniq_id: str
@@ -75,17 +65,22 @@ class ItemResponse(BaseModel):
     port_db: int
     server_db: str
     expiration_date: date
+    # Añadimos los campos de alarmas al esquema de respuesta
+    db_alarms: Optional[str] = None
+    db_user_alarms: Optional[str] = None
+    db_password_alarms: Optional[str] = None
+    db_server_alarms: Optional[str] = None
+    db_port_alarms: Optional[str] = None
 
     class Config:
         from_attributes = True
 
-# Creamos las tablas si no existen (solo si tienes permisos en esa BD)
+# Crear tablas
 Base.metadata.create_all(bind=engine)
 
-# 6. Inicialización de FastAPI
 app = FastAPI(title="Caporale SG API")
 
-# Dependencia para la sesión de base de datos
+# Dependencia DB
 def get_db():
     db = SessionLocal()
     try:
@@ -93,18 +88,11 @@ def get_db():
     finally:
         db.close()
 
-# 7. Endpoints
-#@app.get("/")
-#def read_root():
-#    return {"message": "API de Clientes funcionando correctamente"}
-
-#@app.get("/all", response_model=List[ItemResponse])
-#def read_all(db: Session = Depends(get_db)):
-#    return db.query(Item).all()
+# --- ENDPOINTS ---
 
 @app.get("/get/{codigo}", response_model=ItemResponse)
 def leer_item(codigo: str, db: Session = Depends(get_db)):
-    # Buscamos por el campo uniq_id que envias desde el cliente
+    # 1. Buscar el cliente en la base de datos
     resultado = db.query(Item).filter(Item.uniq_id == codigo).first()
     
     if not resultado:
@@ -112,11 +100,16 @@ def leer_item(codigo: str, db: Session = Depends(get_db)):
             status_code=404, 
             detail=f"El código {codigo} no existe en el sistema"
         )
-    alarms={"DB_ALARMS":DB_ALARMS,
-                        "DB_USER_ALARMS":DB_USER_ALARMS,
-                        "DB_PASSWORD_ALARMS":DB_PASSWORD_ALARMS,
-                        "DB_SERVER_ALARMS":DB_SERVER_ALARMS,
-                        "DB_PORT_ALARMS":DB_PORT_ALARMS 
-                        }
-    "out"
-    return resultado, alarms
+    
+    # 2. Convertir el objeto de SQLAlchemy a un diccionario
+    # Esto es necesario para mezclarlo con los datos de las variables de entorno
+    item_data = {column.name: getattr(resultado, column.name) for column in resultado.__table__.columns}
+    
+    # 3. Inyectar las variables de alarmas en el diccionario de respuesta
+    item_data["db_alarms"] = DB_ALARMS
+    item_data["db_user_alarms"] = DB_USER_ALARMS
+    item_data["db_password_alarms"] = DB_PASSWORD_ALARMS
+    item_data["db_server_alarms"] = DB_SERVER_ALARMS
+    item_data["db_port_alarms"] = DB_PORT_ALARMS
+    
+    return item_data
